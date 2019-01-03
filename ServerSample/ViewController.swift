@@ -7,9 +7,15 @@
 //
 
 import UIKit
+import AVFoundation
 
 class ViewController: UIViewController {
 
+    var videoPreviewView: AVSampleBufferDisplayLayer?
+    
+    
+    @IBOutlet weak var previewLayer: UIView!
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
@@ -18,6 +24,18 @@ class ViewController: UIViewController {
             print(data)
         }
 
+//        while TCPServer.shared.sampleBuffer == nil {}
+        
+        
+        
+        
+        videoPreviewView = AVSampleBufferDisplayLayer()
+        videoPreviewView?.videoGravity = AVLayerVideoGravity.resizeAspectFill
+        videoPreviewView?.frame = view.layer.bounds
+        previewLayer.layer.addSublayer(videoPreviewView!)
+        print("Livevideo")
+        
+        TCPServer.shared.videoPreviewView = videoPreviewView
     }
 }
 

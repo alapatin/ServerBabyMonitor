@@ -9,6 +9,7 @@
 
 
 import Foundation
+import AVFoundation
 
 class TCPServer: NSObject {
     
@@ -25,6 +26,10 @@ class TCPServer: NSObject {
     var openedStreams = 0
     
     var dataReceivedCallback: ((String) -> Void)?
+    
+    
+    
+    var videoPreviewView: AVSampleBufferDisplayLayer?
     
     static let shared = TCPServer()
     
@@ -114,15 +119,78 @@ extension TCPServer: StreamDelegate {
                 return print("no input stream")
             }
             
-            let bufferSize     = 4096 * 5
+            let bufferSize     = 3136320
             var buffer         = Array<UInt8>(repeating: 0, count: bufferSize)
             var message        = ""
             
+            print("frame")
+            
             while inputStream.hasBytesAvailable {
                 
-                let len = inputStream.read(&buffer, maxLength: bufferSize)
                 
-                print(buffer)
+                let len = inputStream.read(&buffer, maxLength: bufferSize)
+                var pixelBuffer: CVPixelBuffer?
+//                var data = Data(buffer) as NSData
+                
+                
+                
+                let pixelBufferError = CVPixelBufferCreateWithBytes(nil,
+                                                                    1920,
+                                                                    1080,
+                                                                    OSType(875704438),
+                                                                    &buffer,
+                                                                    2904,
+                                                                    nil,
+                                                                    nil,
+                                                                    nil,
+                                                                    &pixelBuffer)
+//                print(pixelBufferError)
+                switch pixelBufferError {
+                case kCVReturnInvalidPixelBufferAttributes:
+                    print("1")
+                case kCVReturnInvalidPixelFormat:
+                    print("2")
+                case kCVReturnInvalidSize:
+                    print("3")
+                case kCVReturnPixelBufferNotMetalCompatible:
+                    print("4")
+                case kCVReturnPixelBufferNotOpenGLCompatible:
+                    print("5")
+                default:
+                    break
+                }
+                
+                var timingInfo: CMSampleTimingInfo = .invalid
+                var videoInfo: CMVideoFormatDescription?
+                
+                
+                if pixelBuffer != nil {
+                CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil,
+                                                             imageBuffer: pixelBuffer!,
+                                                             formatDescriptionOut: &videoInfo)
+                
+                
+                var sampleBuffer: CMSampleBuffer?
+                var sampleBufferError = CMSampleBufferCreateForImageBuffer(allocator: nil,
+                                                                        imageBuffer: pixelBuffer!,
+                                                                        dataReady: true,
+                                                                        makeDataReadyCallback: nil,
+                                                                        refcon: nil,
+                                                                        formatDescription: videoInfo!,
+                                                                        sampleTiming: &timingInfo,
+                                                                        sampleBufferOut: &sampleBuffer)
+                    
+                    
+                    if sampleBuffer != nil && videoPreviewView != nil {
+                    print("sampleBuffer")
+                        if (videoPreviewView?.isReadyForMoreMediaData)!{
+                            videoPreviewView?.enqueue(sampleBuffer!)
+                        }
+                    }
+                }
+//                print(buffer)
+                
+                
                 
 //                print("bytes")
 //
