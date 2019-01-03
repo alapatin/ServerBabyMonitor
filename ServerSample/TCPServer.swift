@@ -27,7 +27,9 @@ class TCPServer: NSObject {
     
     var dataReceivedCallback: ((String) -> Void)?
     
+    var timeValue = Int64(102866851137875)
     
+    var pixelBuffer: CVPixelBuffer?
     
     var videoPreviewView: AVSampleBufferDisplayLayer?
     
@@ -121,17 +123,10 @@ extension TCPServer: StreamDelegate {
             
             let bufferSize     = 3136320
             var buffer         = Array<UInt8>(repeating: 0, count: bufferSize)
-            var message        = ""
-            
-            print("frame")
             
             while inputStream.hasBytesAvailable {
                 
-                
                 let len = inputStream.read(&buffer, maxLength: bufferSize)
-                var pixelBuffer: CVPixelBuffer?
-//                var data = Data(buffer) as NSData
-                
                 
                 
                 let pixelBufferError = CVPixelBufferCreateWithBytes(nil,
@@ -144,7 +139,7 @@ extension TCPServer: StreamDelegate {
                                                                     nil,
                                                                     nil,
                                                                     &pixelBuffer)
-//                print(pixelBufferError)
+                
                 switch pixelBufferError {
                 case kCVReturnInvalidPixelBufferAttributes:
                     print("1")
@@ -160,54 +155,49 @@ extension TCPServer: StreamDelegate {
                     break
                 }
                 
-                var timingInfo: CMSampleTimingInfo = .invalid
+                
+                let timeStampManual = CMTimeMake(value: self.timeValue, timescale: 1000000000)
+                
+                var timingInfo: CMSampleTimingInfo = CMSampleTimingInfo(duration: .invalid,
+                                                                        presentationTimeStamp: .zero,
+                                                                        decodeTimeStamp: .invalid)
                 var videoInfo: CMVideoFormatDescription?
                 
+                self.timeValue += (102866884470500 - 102866851137875)
                 
                 if pixelBuffer != nil {
-                CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil,
-                                                             imageBuffer: pixelBuffer!,
-                                                             formatDescriptionOut: &videoInfo)
-                
-                
-                var sampleBuffer: CMSampleBuffer?
-                var sampleBufferError = CMSampleBufferCreateForImageBuffer(allocator: nil,
-                                                                        imageBuffer: pixelBuffer!,
-                                                                        dataReady: true,
-                                                                        makeDataReadyCallback: nil,
-                                                                        refcon: nil,
-                                                                        formatDescription: videoInfo!,
-                                                                        sampleTiming: &timingInfo,
-                                                                        sampleBufferOut: &sampleBuffer)
+                    CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil,
+                                                                 imageBuffer: pixelBuffer!,
+                                                                 formatDescriptionOut: &videoInfo)
                     
+                    
+                    var sampleBuffer: CMSampleBuffer?
+                    var sampleBufferError = CMSampleBufferCreateForImageBuffer(allocator: nil,
+                                                                               imageBuffer: pixelBuffer!,
+                                                                               dataReady: true,
+                                                                               makeDataReadyCallback: nil,
+                                                                               refcon: nil,
+                                                                               formatDescription: videoInfo!,
+                                                                               sampleTiming: &timingInfo,
+                                                                               sampleBufferOut: &sampleBuffer)
+                    
+                    //                    let kCMSampleAttachmentKey_DisplayImmediately = kCFBooleanTrue
+                    //                    CMSetAttachment(sampleBuffer,
+                    //                                    key: kCMSampleAttachmentKey_DisplayImmediately,
+                    //                                    value: true,
+                    //                                    attachmentMode: CMAttachmentMode)
                     
                     if sampleBuffer != nil && videoPreviewView != nil {
-                    print("sampleBuffer")
+                        print("sampleBuffer")
                         if (videoPreviewView?.isReadyForMoreMediaData)!{
                             videoPreviewView?.enqueue(sampleBuffer!)
+                            
                         }
                     }
+            
                 }
-//                print(buffer)
-                
-                
-                
-//                print("bytes")
-//
-//
-//                if len < 0 {
-//                    print("error reading stream...")
-//                    return self.closeStreams()
-//                }
-//                if len > 0 {
-//                    message += String(bytes: buffer, encoding: .utf8)!
-//                }
-//                if len == 0 {
-//                    print("no more bytes available...")
-//                    break
-//                }
             }
-            self.dataReceivedCallback?(message)
+            
         }
     }
 }

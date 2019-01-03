@@ -24,11 +24,6 @@ class ViewController: UIViewController {
             print(data)
         }
 
-//        while TCPServer.shared.sampleBuffer == nil {}
-        
-        
-        
-        
         videoPreviewView = AVSampleBufferDisplayLayer()
         videoPreviewView?.videoGravity = AVLayerVideoGravity.resizeAspectFill
         videoPreviewView?.frame = view.layer.bounds
