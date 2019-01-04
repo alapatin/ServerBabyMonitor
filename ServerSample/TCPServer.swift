@@ -25,7 +25,7 @@ class TCPServer: NSObject {
     var outputStream: OutputStream?
     var openedStreams = 0
     
-    var dataReceivedCallback: ((String) -> Void)?
+    var dataReceivedCallback: ((CMSampleBuffer) -> Void)?
     
     var timeValue = Int64(102866851137875)
     
@@ -128,6 +128,7 @@ extension TCPServer: StreamDelegate {
                 
                 let len = inputStream.read(&buffer, maxLength: bufferSize)
                 
+//                print(buffer)
                 
                 let pixelBufferError = CVPixelBufferCreateWithBytes(nil,
                                                                     1920,
@@ -139,23 +140,7 @@ extension TCPServer: StreamDelegate {
                                                                     nil,
                                                                     nil,
                                                                     &pixelBuffer)
-                
-                switch pixelBufferError {
-                case kCVReturnInvalidPixelBufferAttributes:
-                    print("1")
-                case kCVReturnInvalidPixelFormat:
-                    print("2")
-                case kCVReturnInvalidSize:
-                    print("3")
-                case kCVReturnPixelBufferNotMetalCompatible:
-                    print("4")
-                case kCVReturnPixelBufferNotOpenGLCompatible:
-                    print("5")
-                default:
-                    break
-                }
-                
-                
+           
                 let timeStampManual = CMTimeMake(value: self.timeValue, timescale: 1000000000)
                 
                 var timingInfo: CMSampleTimingInfo = CMSampleTimingInfo(duration: .invalid,
@@ -187,17 +172,12 @@ extension TCPServer: StreamDelegate {
                     //                                    value: true,
                     //                                    attachmentMode: CMAttachmentMode)
                     
-                    if sampleBuffer != nil && videoPreviewView != nil {
-                        print("sampleBuffer")
-                        if (videoPreviewView?.isReadyForMoreMediaData)!{
-                            videoPreviewView?.enqueue(sampleBuffer!)
-                            
+                        if sampleBuffer != nil {
+                                print("enqueue")
+                            self.dataReceivedCallback?(sampleBuffer!)
                         }
-                    }
-            
                 }
             }
-            
         }
     }
 }

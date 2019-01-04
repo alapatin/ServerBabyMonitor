@@ -19,10 +19,6 @@ class ViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
-        
-        TCPServer.shared.dataReceivedCallback = { data in
-            print(data)
-        }
 
         videoPreviewView = AVSampleBufferDisplayLayer()
         videoPreviewView?.videoGravity = AVLayerVideoGravity.resizeAspectFill
@@ -30,7 +26,12 @@ class ViewController: UIViewController {
         previewLayer.layer.addSublayer(videoPreviewView!)
         print("Livevideo")
         
-        TCPServer.shared.videoPreviewView = videoPreviewView
+        TCPServer.shared.dataReceivedCallback = { buffer in
+            
+            if (self.videoPreviewView?.isReadyForMoreMediaData)!{
+                self.videoPreviewView?.enqueue(buffer)
+            }
+        }
     }
 }
 
