@@ -12,9 +12,11 @@ import AVFoundation
 class ViewController: UIViewController {
 
     var videoPreviewView: AVSampleBufferDisplayLayer?
-    
+    var controlTimebase: CMTimebase?
     
     @IBOutlet weak var previewLayer: UIView!
+    @IBOutlet weak var label: UILabel!
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -23,8 +25,25 @@ class ViewController: UIViewController {
         videoPreviewView = AVSampleBufferDisplayLayer()
         videoPreviewView?.videoGravity = AVLayerVideoGravity.resizeAspectFill
         videoPreviewView?.frame = view.layer.bounds
+        
+        
+//        CMTimebaseCreateWithMasterClock(allocator: CFAllocatorGetDefault() as! CFAllocator,
+//                                        masterClock: CMClockGetHostTimeClock(),
+//                                        timebaseOut: &controlTimebase);
+//        
+//        CMTimebaseSetTime(self.videoPreviewView!.controlTimebase!, time: CMTime.zero);
+//        CMTimebaseSetRate(self.videoPreviewView!.controlTimebase!, rate: 1.0);
+        
         previewLayer.layer.addSublayer(videoPreviewView!)
         print("Livevideo")
+        
+//        TCPServer.shared.imagePrint = { image in
+//            self.imageView.image = image
+//        }
+        
+        TCPServer.shared.labelPrint = {
+            self.label.text = "Hello, World"
+        }
         
         TCPServer.shared.dataReceivedCallback = { buffer in
             

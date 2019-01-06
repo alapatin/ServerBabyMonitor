@@ -10,6 +10,8 @@
 
 import Foundation
 import AVFoundation
+import VideoToolbox
+
 
 class TCPServer: NSObject {
     
@@ -26,10 +28,11 @@ class TCPServer: NSObject {
     var openedStreams = 0
     
     var dataReceivedCallback: ((CMSampleBuffer) -> Void)?
-    
-    var timeValue = Int64(102866851137875)
+    var labelPrint: (() -> ())?
     
     var pixelBuffer: CVPixelBuffer?
+    
+    var formatDesc: CMVideoFormatDescription?
     
     var videoPreviewView: AVSampleBufferDisplayLayer?
     
@@ -77,7 +80,7 @@ extension TCPServer: NetServiceDelegate {
     
     func netServiceDidPublish(_ sender: NetService) {
         self.registeredName = sender.name
-        print("Service name: \(sender.port)")
+        print("Service name: \(sender.name)")
     }
     
     func netService(_ sender: NetService, didAcceptConnectionWith inputStream: InputStream, outputStream: OutputStream) {
@@ -117,66 +120,108 @@ extension TCPServer: StreamDelegate {
         }
         
         if eventCode.contains(.hasBytesAvailable) {
+            
             guard let inputStream = self.inputStream else {
                 return print("no input stream")
             }
             
-            let bufferSize     = 3136320
+            let bufferSize     = 60000
             var buffer         = Array<UInt8>(repeating: 0, count: bufferSize)
             
             while inputStream.hasBytesAvailable {
+                let readStatus = inputStream.read(&buffer, maxLength: bufferSize)
+                //???
+                //                let bytes = inputStream.getBuffer(&buffer, length: &bufferSize)
+                self.labelPrint!()
                 
-                let len = inputStream.read(&buffer, maxLength: bufferSize)
                 
-//                print(buffer)
+                // Decompression session
                 
-                let pixelBufferError = CVPixelBufferCreateWithBytes(nil,
-                                                                    1920,
-                                                                    1080,
-                                                                    OSType(875704438),
-                                                                    &buffer,
-                                                                    2904,
-                                                                    nil,
-                                                                    nil,
-                                                                    nil,
-                                                                    &pixelBuffer)
-           
-                let timeStampManual = CMTimeMake(value: self.timeValue, timescale: 1000000000)
+                let decompressionSession: VTDecompressionSession?
+                let videoLayer: AVSampleBufferDisplayLayer?
+                var spsSize: Int!
+                var ppsSize: Int!
                 
-                var timingInfo: CMSampleTimingInfo = CMSampleTimingInfo(duration: .invalid,
-                                                                        presentationTimeStamp: .zero,
-                                                                        decodeTimeStamp: .invalid)
-                var videoInfo: CMVideoFormatDescription?
                 
-                self.timeValue += (102866884470500 - 102866851137875)
+                let data: UInt8?
+                let pps: UnsafeMutableRawPointer?
+                let sps: UnsafeMutableRawPointer?
+                let startCodeIndex = 0
+                var secondCodeIndex = 0
+                var thirdCodeIndex = 0
                 
-                if pixelBuffer != nil {
-                    CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil,
-                                                                 imageBuffer: pixelBuffer!,
-                                                                 formatDescriptionOut: &videoInfo)
-                    
-                    
-                    var sampleBuffer: CMSampleBuffer?
-                    var sampleBufferError = CMSampleBufferCreateForImageBuffer(allocator: nil,
-                                                                               imageBuffer: pixelBuffer!,
-                                                                               dataReady: true,
-                                                                               makeDataReadyCallback: nil,
-                                                                               refcon: nil,
-                                                                               formatDescription: videoInfo!,
-                                                                               sampleTiming: &timingInfo,
-                                                                               sampleBufferOut: &sampleBuffer)
-                    
-                    //                    let kCMSampleAttachmentKey_DisplayImmediately = kCFBooleanTrue
-                    //                    CMSetAttachment(sampleBuffer,
-                    //                                    key: kCMSampleAttachmentKey_DisplayImmediately,
-                    //                                    value: true,
-                    //                                    attachmentMode: CMAttachmentMode)
-                    
-                        if sampleBuffer != nil {
-                                print("enqueue")
-                            self.dataReceivedCallback?(sampleBuffer!)
-                        }
+                let blockLength = 0
+                
+                let sampleBuffer: CMSampleBuffer?
+                let blockBuffer: CMBlockBuffer?
+                
+                var NaluType = (buffer[startCodeIndex + 4] & 0x1F)
+                
+                // ??? format description
+                if NaluType != 7 && formatDesc == nil {
+                    print("Error: Frame is not an I Frame")
                 }
+                
+                // NALU type 7 is the SPS parameter
+                if NaluType == 7 {
+                    print("NALU type: 7")
+                    for index in (startCodeIndex + 4)..<(startCodeIndex + 40) {
+                        if buffer[index] == 0x00 && buffer[index + 1] == 0x00 && buffer[index + 2] == 0x00 && buffer[index + 3] == 0x01 {
+                            secondCodeIndex = index
+                            spsSize = secondCodeIndex
+                        }
+                    }
+                }
+                
+                // find what the second NALU type is
+                NaluType = (buffer[secondCodeIndex + 4] & 0x1F);
+                
+                // NALU type 8 is the PPS parameter
+                
+                if NaluType == 8 {
+                    //???
+                    for index in (spsSize + 12)..<(spsSize + 50){
+                        if buffer[index] == 0x00 && buffer[index + 1] == 0x00 && buffer[index + 2] == 0x00 && buffer[index + 3] == 0x01 {
+                            thirdCodeIndex = index
+                            ppsSize = thirdCodeIndex - spsSize
+                        }
+                    }
+                }
+                
+                sps = malloc(spsSize - 4);
+                pps = malloc(ppsSize - 4);
+                
+                // copy in the actual sps and pps values, again ignoring the 4 byte header
+                memcpy (sps, &buffer[4], spsSize - 4);
+                memcpy (pps, &buffer[spsSize + 4], ppsSize - 4);
+                
+                // now we set our H264 parameters
+                let spsPointer = UnsafePointer(sps!.bindMemory(to: UInt8.self, capacity: spsSize - 4))
+                let ppsPointer = UnsafePointer(pps!.bindMemory(to: UInt8.self, capacity: ppsSize - 4))
+                
+                // make pointers array
+                let dataParamArray = [spsPointer, ppsPointer]
+                let parameterSetPointers = UnsafePointer<UnsafePointer<UInt8>>(dataParamArray)
+                
+                // make parameter sizes array
+                let sizeParamArray = [spsSize!, ppsSize!]
+                let parameterSetSizes = UnsafePointer<Int>(sizeParamArray)
+                
+                let statusFormatDescription =
+                    CMVideoFormatDescriptionCreateFromH264ParameterSets(allocator: nil,
+                                                                        parameterSetCount: 2,
+                                                                        parameterSetPointers: parameterSetPointers,
+                                                                        parameterSetSizes: parameterSetSizes,
+                                                                        nalUnitHeaderLength: 4,
+                                                                        formatDescriptionOut: &formatDesc)
+                
+                
+                
+                //                    CMVideoFormatDescriptionCreateFromH264ParameterSets(nil, 2,
+                //                                                                             (const uint8_t *const*)parameterSetPointers,
+                //                                                                             parameterSetSizes, 4,
+                //                                                                             &formatDesc);
+                //
             }
         }
     }
