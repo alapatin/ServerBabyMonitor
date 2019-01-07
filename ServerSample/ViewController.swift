@@ -45,10 +45,15 @@ class ViewController: UIViewController {
             self.label.text = "Hello, World"
         }
         
+        //diaplay with AVSampleBufferDisplayLayer
         TCPServer.shared.dataReceivedCallback = { buffer in
             
             if (self.videoPreviewView?.isReadyForMoreMediaData)!{
                 self.videoPreviewView?.enqueue(buffer)
+                DispatchQueue.main.async(execute: {
+                    self.videoPreviewView?.setNeedsDisplay()
+                })
+                
             }
         }
     }

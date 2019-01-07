@@ -13,6 +13,7 @@ import AVFoundation
 import VideoToolbox
 
 
+
 class TCPServer: NSObject {
     
     let domain = "local"
@@ -33,6 +34,14 @@ class TCPServer: NSObject {
     var pixelBuffer: CVPixelBuffer?
     
     var formatDesc: CMVideoFormatDescription?
+    
+    
+    var bufferPoint: UnsafeMutablePointer<UInt8>?
+    var bufferLengthPoint: UnsafeMutablePointer<Int>?
+    
+    
+    
+    
     
     var videoPreviewView: AVSampleBufferDisplayLayer?
     
@@ -125,41 +134,48 @@ extension TCPServer: StreamDelegate {
                 return print("no input stream")
             }
             
-            let bufferSize     = 60000
+            let bufferSize     = 300000
             var buffer         = Array<UInt8>(repeating: 0, count: bufferSize)
             
+//            var bufferNew:UnsafeMutablePointer<UInt8>?
+//            var lengthNew:Int = 0
+//            var successNew = inputStream.getBuffer(&bufferNew, length: &lengthNew)
+//            print(bufferNew)
+//            print(lengthNew)
+            
             while inputStream.hasBytesAvailable {
-                let readStatus = inputStream.read(&buffer, maxLength: bufferSize)
-                //???
-                //                let bytes = inputStream.getBuffer(&buffer, length: &bufferSize)
+                let bytesFromStream = inputStream.read(&buffer, maxLength: bufferSize)
+                if bytesFromStream < 0 {
+                    print("Error: read buffer")
+                    return
+                }
                 self.labelPrint!()
+                print("bytesFromStream: \(bytesFromStream)")
+                
+// Decompression session
+                
+//                let decompressionSession: VTDecompressionSession?
+//                let videoLayer: AVSampleBufferDisplayLayer?
                 
                 
-                // Decompression session
-                
-                let decompressionSession: VTDecompressionSession?
-                let videoLayer: AVSampleBufferDisplayLayer?
                 var spsSize: Int!
                 var ppsSize: Int!
-                
-                
-                let data: UInt8?
-                let pps: UnsafeMutableRawPointer?
-                let sps: UnsafeMutableRawPointer?
+                //                let data: UInt8?
+                var pps: UnsafeMutableRawPointer?
+                var sps: UnsafeMutableRawPointer?
                 let startCodeIndex = 0
                 var secondCodeIndex = 0
                 var thirdCodeIndex = 0
                 
-                let blockLength = 0
-                
-                let sampleBuffer: CMSampleBuffer?
-                let blockBuffer: CMBlockBuffer?
+                var blockLength = 0
+                var blockBuffer: CMBlockBuffer?
+                var sampleBuffer: CMSampleBuffer?
                 
                 var NaluType = (buffer[startCodeIndex + 4] & 0x1F)
-                
-                // ??? format description
+                print(NaluType)
                 if NaluType != 7 && formatDesc == nil {
                     print("Error: Frame is not an I Frame")
+                    return
                 }
                 
                 // NALU type 7 is the SPS parameter
@@ -169,44 +185,79 @@ extension TCPServer: StreamDelegate {
                         if buffer[index] == 0x00 && buffer[index + 1] == 0x00 && buffer[index + 2] == 0x00 && buffer[index + 3] == 0x01 {
                             secondCodeIndex = index
                             spsSize = secondCodeIndex
+                            print("spsSize: \(spsSize)")
+                            break
+                            
                         }
                     }
-                }
-                
                 // find what the second NALU type is
-                NaluType = (buffer[secondCodeIndex + 4] & 0x1F);
+                NaluType = (buffer[secondCodeIndex + 4] & 0x1F)
+                    print("2nd NALU type: \(NaluType)")
+                }
                 
                 // NALU type 8 is the PPS parameter
                 
                 if NaluType == 8 {
                     //???
-                    for index in (spsSize + 12)..<(spsSize + 50){
+                    
+                    if spsSize == nil {
+                        return
+                    }
+                    
+                    for index in (spsSize + 8)..<(spsSize + 50){
                         if buffer[index] == 0x00 && buffer[index + 1] == 0x00 && buffer[index + 2] == 0x00 && buffer[index + 3] == 0x01 {
                             thirdCodeIndex = index
                             ppsSize = thirdCodeIndex - spsSize
+                            break
                         }
                     }
-                }
+                
+                    
                 
                 sps = malloc(spsSize - 4);
                 pps = malloc(ppsSize - 4);
-                
+
                 // copy in the actual sps and pps values, again ignoring the 4 byte header
-                memcpy (sps, &buffer[4], spsSize - 4);
-                memcpy (pps, &buffer[spsSize + 4], ppsSize - 4);
-                
-                // now we set our H264 parameters
+//                sps = memcpy (sps!, &buffer[4], spsSize - 4);
+//                pps = memcpy (pps!, &buffer[spsSize + 4], ppsSize - 4);
+
+                    
+                    for i in 0...(spsSize - 5) {
+                        memcpy(sps! + i, &buffer[4 + i], 1)
+                    }
+                    
+                    for i in 0...(ppsSize - 5) {
+                        memcpy(pps! + i, &buffer[spsSize + 4 + i], 1)
+                    }
+                    
+                    
+//                // now we set our H264 parameters
                 let spsPointer = UnsafePointer(sps!.bindMemory(to: UInt8.self, capacity: spsSize - 4))
                 let ppsPointer = UnsafePointer(pps!.bindMemory(to: UInt8.self, capacity: ppsSize - 4))
-                
-                // make pointers array
+//
+//                // make pointers array
                 let dataParamArray = [spsPointer, ppsPointer]
                 let parameterSetPointers = UnsafePointer<UnsafePointer<UInt8>>(dataParamArray)
-                
-                // make parameter sizes array
+//
+//                // make parameter sizes array
                 let sizeParamArray = [spsSize!, ppsSize!]
                 let parameterSetSizes = UnsafePointer<Int>(sizeParamArray)
-                
+//
+//                    var spsN = buffer[4...(spsSize - 1)]
+//                    let ppsN = buffer[(spsSize + 4)...(spsSize + ppsSize - 1)]
+//
+//                    let spsData: NSData = NSData(bytes: &spsN, length: spsSize)
+//                    let x = spsData.
+////
+//                    let arrayN = [spsN, ppsN]
+//                    let arrayPointer = UnsafePointer<UnsafePointer<UInt8>>(arrayN)
+//                    let x = UnsafeMutableRawPointer.allocate(byteCount: spsSize - 4, alignment: 10)
+//                    let y = UnsafeMutableRawPointer.allocate(byteCount: ppsSize - 4, alignment: 20)
+//
+//                    x.copyMemory(from: &buffer[4], byteCount: spsSize - 4)
+//                    y.copyMemory(from: &buffer[spsSize + 4], byteCount: ppsSize - 4)
+                    
+                    
                 let statusFormatDescription =
                     CMVideoFormatDescriptionCreateFromH264ParameterSets(allocator: nil,
                                                                         parameterSetCount: 2,
@@ -214,14 +265,133 @@ extension TCPServer: StreamDelegate {
                                                                         parameterSetSizes: parameterSetSizes,
                                                                         nalUnitHeaderLength: 4,
                                                                         formatDescriptionOut: &formatDesc)
+                    if statusFormatDescription != noErr {
+                        print("Error: Can't create description")
+                    }
+////
+                    while NaluType != 5 {
+                        for index in (spsSize + ppsSize + 8)..<(ppsSize + ppsSize + 150){
+                        if buffer[index] == 0x00 && buffer[index + 1] == 0x00 && buffer[index + 2] == 0x00 && buffer[index + 3] == 0x01 {
+                            thirdCodeIndex = index
+                            NaluType = (buffer[thirdCodeIndex + 4] & 0x1F)
+                            break
+                        }
+                    }
+                    }
+                
+//                NaluType = (buffer[thirdCodeIndex + 4] & 0x1F)
+                    print("3d nalu type: \(NaluType)")
+                }
+                
+                // CREATE DECOMPRESSION SESSON IF NEED
+                
+                // NALU type 5 is an IDR frame
+                if NaluType == 5 {
+                    
+                    // find the offset, or where the SPS and PPS NALUs end and the IDR frame NALU begins
+                    let offset = thirdCodeIndex
+                    blockLength = bytesFromStream - offset
+    ////////////////////////////
+                    var dataFrame = malloc(blockLength)
+//                    memcpy(dataFrame, &buffer[offset], blockLength)
+      //////////////////////
+                    
+                    for i in 0...(blockLength - 1) {
+                        memcpy(dataFrame! + i, &buffer[offset + i], 1)
+                    }
+                    
+                    // replace the start code header on this NALU with its size.
+                    // AVCC format requires that you do this.
+                    // htonl converts the unsigned int from host to network byte order
+                    
+                    var dataLength32 = CFSwapInt32HostToBig(UInt32(blockLength - 4))
+            ///////////////
+                    memcpy(dataFrame, &dataLength32, 4)
+           ////////////////////
+                    // create a block buffer from the IDR NALU
+                    
+                    let statusBlockBuffer = CMBlockBufferCreateWithMemoryBlock(allocator: nil,
+                                                                               memoryBlock: dataFrame,
+                                                                               blockLength: blockLength,
+                                                                               blockAllocator: kCFAllocatorNull,
+                                                                               customBlockSource: nil,
+                                                                               offsetToData: 0,
+                                                                               dataLength: blockLength,
+                                                                               flags: 0,
+                                                                               blockBufferOut: &blockBuffer)
+                    
+                    if statusBlockBuffer == kCMBlockBufferNoErr {
+                        print("Create block buffer IDR frame")
+                    }
+                }
+                
+                // NALU type 1 is non-IDR
+                if NaluType == 1 {
+                    
+                    blockLength = bytesFromStream;
+                    let dataFrame = malloc(blockLength);
+    /////////////////////
+//                    memcpy(dataFrame, &buffer[0], blockLength);
+                    for i in 0...(blockLength - 1) {
+                        memcpy(dataFrame! + i, &buffer[i], 1)
+                    }
+                    
+        ///////////////////
+                    // again, replace the start header with the size of the NALU
+                    var dataLength32 = CFSwapInt32HostToBig(UInt32(blockLength - 4))
+        /////////////////
+                    memcpy (dataFrame, &dataLength32, 4);
+          ////////////////
+                    let statusBB = CMBlockBufferCreateWithMemoryBlock(allocator: nil,
+                                                                      memoryBlock: dataFrame,
+                                                                      blockLength: blockLength,
+                                                                      blockAllocator: kCFAllocatorNull,
+                                                                      customBlockSource: nil,
+                                                                      offsetToData: 0,
+                                                                      dataLength: blockLength,
+                                                                      flags: 0,
+                                                                      blockBufferOut: &blockBuffer)
+                    if statusBB == kCMBlockBufferNoErr {
+                        print("Create block buffer NON-IDR frame")
+                    }
+                }
                 
                 
                 
-                //                    CMVideoFormatDescriptionCreateFromH264ParameterSets(nil, 2,
-                //                                                                             (const uint8_t *const*)parameterSetPointers,
-                //                                                                             parameterSetSizes, 4,
-                //                                                                             &formatDesc);
-                //
+                
+                // now create our sample buffer from the block buffer,
+                
+                var sampleSize: size_t = blockLength
+                
+                let statusSB = CMSampleBufferCreate(allocator: kCFAllocatorDefault,
+                                                    dataBuffer: blockBuffer,
+                                                    dataReady: true,
+                                                    makeDataReadyCallback: nil,
+                                                    refcon: nil,
+                                                    formatDescription: formatDesc,
+                                                    sampleCount: 1,
+                                                    sampleTimingEntryCount: 0,
+                                                    sampleTimingArray: nil,
+                                                    sampleSizeEntryCount: 1,
+                                                    sampleSizeArray: &sampleSize,
+                                                    sampleBufferOut: &sampleBuffer)
+                if statusSB == noErr {
+                    print("Create sample buffer")
+                    
+                }
+                
+                if let bufferAtt = sampleBuffer {
+                    let attachments: CFArray! = CMSampleBufferGetSampleAttachmentsArray(bufferAtt,
+                                                                                        createIfNecessary: true)
+                    let dictionary = unsafeBitCast(CFArrayGetValueAtIndex(attachments, 0),
+                                                   to: CFMutableDictionary.self)
+                    let key = Unmanaged.passUnretained(kCMSampleAttachmentKey_DisplayImmediately).toOpaque()
+                    let value = Unmanaged.passUnretained(kCFBooleanTrue).toOpaque()
+                    CFDictionarySetValue(dictionary, key, value)
+                }
+                
+                self.dataReceivedCallback!(sampleBuffer!)
+                
             }
         }
     }
