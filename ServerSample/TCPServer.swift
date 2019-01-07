@@ -6,13 +6,9 @@
 //  Copyright © 2018 a.lapatin@icloud.com. All rights reserved.
 //
 
-
-
 import Foundation
 import AVFoundation
 import VideoToolbox
-
-
 
 class TCPServer: NSObject {
     
@@ -38,11 +34,7 @@ class TCPServer: NSObject {
     
     var bufferPoint: UnsafeMutablePointer<UInt8>?
     var bufferLengthPoint: UnsafeMutablePointer<Int>?
-    
-    
-    
-    
-    
+
     var videoPreviewView: AVSampleBufferDisplayLayer?
     
     static let shared = TCPServer()
@@ -137,12 +129,6 @@ extension TCPServer: StreamDelegate {
             let bufferSize     = 300000
             var buffer         = Array<UInt8>(repeating: 0, count: bufferSize)
             
-//            var bufferNew:UnsafeMutablePointer<UInt8>?
-//            var lengthNew:Int = 0
-//            var successNew = inputStream.getBuffer(&bufferNew, length: &lengthNew)
-//            print(bufferNew)
-//            print(lengthNew)
-            
             while inputStream.hasBytesAvailable {
                 let bytesFromStream = inputStream.read(&buffer, maxLength: bufferSize)
                 if bytesFromStream < 0 {
@@ -153,10 +139,6 @@ extension TCPServer: StreamDelegate {
                 print("bytesFromStream: \(bytesFromStream)")
                 
 // Decompression session
-                
-//                let decompressionSession: VTDecompressionSession?
-//                let videoLayer: AVSampleBufferDisplayLayer?
-                
                 
                 var spsSize: Int!
                 var ppsSize: Int!
@@ -185,7 +167,6 @@ extension TCPServer: StreamDelegate {
                         if buffer[index] == 0x00 && buffer[index + 1] == 0x00 && buffer[index + 2] == 0x00 && buffer[index + 3] == 0x01 {
                             secondCodeIndex = index
                             spsSize = secondCodeIndex
-                            print("spsSize: \(spsSize)")
                             break
                             
                         }
@@ -242,22 +223,7 @@ extension TCPServer: StreamDelegate {
 //                // make parameter sizes array
                 let sizeParamArray = [spsSize!, ppsSize!]
                 let parameterSetSizes = UnsafePointer<Int>(sizeParamArray)
-//
-//                    var spsN = buffer[4...(spsSize - 1)]
-//                    let ppsN = buffer[(spsSize + 4)...(spsSize + ppsSize - 1)]
-//
-//                    let spsData: NSData = NSData(bytes: &spsN, length: spsSize)
-//                    let x = spsData.
-////
-//                    let arrayN = [spsN, ppsN]
-//                    let arrayPointer = UnsafePointer<UnsafePointer<UInt8>>(arrayN)
-//                    let x = UnsafeMutableRawPointer.allocate(byteCount: spsSize - 4, alignment: 10)
-//                    let y = UnsafeMutableRawPointer.allocate(byteCount: ppsSize - 4, alignment: 20)
-//
-//                    x.copyMemory(from: &buffer[4], byteCount: spsSize - 4)
-//                    y.copyMemory(from: &buffer[spsSize + 4], byteCount: ppsSize - 4)
-                    
-                    
+
                 let statusFormatDescription =
                     CMVideoFormatDescriptionCreateFromH264ParameterSets(allocator: nil,
                                                                         parameterSetCount: 2,
@@ -268,7 +234,7 @@ extension TCPServer: StreamDelegate {
                     if statusFormatDescription != noErr {
                         print("Error: Can't create description")
                     }
-////
+
                     while NaluType != 5 {
                         for index in (spsSize + ppsSize + 8)..<(ppsSize + ppsSize + 150){
                         if buffer[index] == 0x00 && buffer[index + 1] == 0x00 && buffer[index + 2] == 0x00 && buffer[index + 3] == 0x01 {
@@ -279,7 +245,6 @@ extension TCPServer: StreamDelegate {
                     }
                     }
                 
-//                NaluType = (buffer[thirdCodeIndex + 4] & 0x1F)
                     print("3d nalu type: \(NaluType)")
                 }
                 
@@ -291,11 +256,9 @@ extension TCPServer: StreamDelegate {
                     // find the offset, or where the SPS and PPS NALUs end and the IDR frame NALU begins
                     let offset = thirdCodeIndex
                     blockLength = bytesFromStream - offset
-    ////////////////////////////
-                    var dataFrame = malloc(blockLength)
-//                    memcpy(dataFrame, &buffer[offset], blockLength)
-      //////////////////////
-                    
+
+                    let dataFrame = malloc(blockLength)
+
                     for i in 0...(blockLength - 1) {
                         memcpy(dataFrame! + i, &buffer[offset + i], 1)
                     }
@@ -305,9 +268,9 @@ extension TCPServer: StreamDelegate {
                     // htonl converts the unsigned int from host to network byte order
                     
                     var dataLength32 = CFSwapInt32HostToBig(UInt32(blockLength - 4))
-            ///////////////
+
                     memcpy(dataFrame, &dataLength32, 4)
-           ////////////////////
+
                     // create a block buffer from the IDR NALU
                     
                     let statusBlockBuffer = CMBlockBufferCreateWithMemoryBlock(allocator: nil,
@@ -330,18 +293,17 @@ extension TCPServer: StreamDelegate {
                     
                     blockLength = bytesFromStream;
                     let dataFrame = malloc(blockLength);
-    /////////////////////
-//                    memcpy(dataFrame, &buffer[0], blockLength);
+
                     for i in 0...(blockLength - 1) {
                         memcpy(dataFrame! + i, &buffer[i], 1)
                     }
                     
-        ///////////////////
+        
                     // again, replace the start header with the size of the NALU
                     var dataLength32 = CFSwapInt32HostToBig(UInt32(blockLength - 4))
-        /////////////////
+        
                     memcpy (dataFrame, &dataLength32, 4);
-          ////////////////
+          
                     let statusBB = CMBlockBufferCreateWithMemoryBlock(allocator: nil,
                                                                       memoryBlock: dataFrame,
                                                                       blockLength: blockLength,
@@ -355,10 +317,7 @@ extension TCPServer: StreamDelegate {
                         print("Create block buffer NON-IDR frame")
                     }
                 }
-                
-                
-                
-                
+ 
                 // now create our sample buffer from the block buffer,
                 
                 var sampleSize: size_t = blockLength
