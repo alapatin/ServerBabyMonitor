@@ -27,6 +27,7 @@ class ViewController: UIViewController {
         videoPreviewView?.frame = view.layer.bounds
         
         
+        
 //        CMTimebaseCreateWithMasterClock(allocator: CFAllocatorGetDefault() as! CFAllocator,
 //                                        masterClock: CMClockGetHostTimeClock(),
 //                                        timebaseOut: &controlTimebase);
@@ -36,10 +37,6 @@ class ViewController: UIViewController {
         
         previewLayer.layer.addSublayer(videoPreviewView!)
         print("Livevideo")
-        
-//        TCPServer.shared.imagePrint = { image in
-//            self.imageView.image = image
-//        }
         
         TCPServer.shared.labelPrint = {
             self.label.text = "Hello, World"
