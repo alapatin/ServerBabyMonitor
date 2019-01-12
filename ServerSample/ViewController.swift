@@ -27,7 +27,6 @@ class ViewController: UIViewController {
         videoPreviewView?.frame = view.layer.bounds
         
         
-        
 //        CMTimebaseCreateWithMasterClock(allocator: CFAllocatorGetDefault() as! CFAllocator,
 //                                        masterClock: CMClockGetHostTimeClock(),
 //                                        timebaseOut: &controlTimebase);
@@ -36,7 +35,6 @@ class ViewController: UIViewController {
 //        CMTimebaseSetRate(self.videoPreviewView!.controlTimebase!, rate: 1.0);
         
         previewLayer.layer.addSublayer(videoPreviewView!)
-        print("Livevideo")
         
         TCPServer.shared.labelPrint = {
             self.label.text = "Hello, World"
@@ -46,7 +44,9 @@ class ViewController: UIViewController {
         TCPServer.shared.dataReceivedCallback = { buffer in
             
             if (self.videoPreviewView?.isReadyForMoreMediaData)!{
+                
                 self.videoPreviewView?.enqueue(buffer)
+//                self.videoPreviewView?.setNeedsDisplay()
                 DispatchQueue.main.async(execute: {
                     self.videoPreviewView?.setNeedsDisplay()
                 })
