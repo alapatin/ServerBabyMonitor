@@ -101,7 +101,7 @@ extension TCPServer: NetServiceDelegate {
             self?.inputStream = inputStream
             self?.outputStream = outputStream
             self?.openStreams()
-            
+        
             print("connection accepted: streams opened.")
         }
     }
@@ -120,6 +120,10 @@ extension TCPServer: StreamDelegate {
                 self.serviceRunning = false
                 self.registeredName = nil
             }
+            
+//            let data = "Hello, World".data(using: .utf8)!
+//            let _ = data.withUnsafeBytes { outputStream?.write($0, maxLength: data.count) }
+
         }
         
         if eventCode.contains(.hasBytesAvailable) {
@@ -128,11 +132,11 @@ extension TCPServer: StreamDelegate {
                 return print("no input stream")
             }
             
-            let bufferSize     = 50000
+            let bufferSize     = 400000
             var buffer         = Array<UInt8>(repeating: 0, count: bufferSize)
             
-            let bufferSize2     = 50000
-            var buffer2       = Array<UInt8>(repeating: 0, count: bufferSize)
+            let bufferSize2     = 256
+//            var buffer2       = Array<UInt8>(repeating: 0, count: bufferSize)
             
 //            let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
             
@@ -140,25 +144,26 @@ extension TCPServer: StreamDelegate {
 //            print("NOT ENDENCOUTERED")
 //            }
             
-            while inputStream.hasBytesAvailable {
+//            while inputStream.hasBytesAvailable {
             
 //            if eventCode == Stream.Event.endEncountered {
             
             
-                var bytesFromStream = inputStream.read(&buffer, maxLength: bufferSize)
-                
+//                var bytesFromStream = inputStream.read(&buffer, maxLength: bufferSize)
+            
+                var bytesFromStream = 0
+
                 while inputStream.hasBytesAvailable {
-                var bytesFromStream2 = inputStream.read(&buffer + (bytesFromStream - 1), maxLength: bufferSize2)
+
+                var bytesFromStream2 = inputStream.read(&buffer + (bytesFromStream), maxLength: bufferSize2)
                    bytesFromStream += bytesFromStream2
                 }
                 
                 
-//                buffer.insert(buffer2, at: bytesFromStream)
-                
-                
             
-                if bytesFromStream < 0 {
+                if bytesFromStream <= 0 {
                     print("Error: read buffer")
+                    
                     return
                 }
                 self.labelPrint!()
@@ -392,7 +397,7 @@ extension TCPServer: StreamDelegate {
                             print("Create block buffer IDR frame")
 //                            print("------------------------------")
                         }
-//                        dataFrame?.deallocate()
+                        dataFrame?.deallocate()
                     }
 
                     // NALU type 1 is non-IDR
@@ -426,7 +431,7 @@ extension TCPServer: StreamDelegate {
 
                         }
                         
-//                        dataFrame?.deallocate()
+                        dataFrame?.deallocate()
                     }
                     
                     // now create our sample buffer from the block buffer,
@@ -462,10 +467,24 @@ extension TCPServer: StreamDelegate {
                         CFDictionarySetValue(dictionary, key, value)
                     }
                     
-//                    self.dataReceivedCallback!(sampleBuffer!)
+                    // 0b00110011 equal 51 decimal
+                    var ready: [UInt8] = [0,0,1,1,0,0,1,1]
+                    outputStream!.write(&ready, maxLength: ready.count)
+                    
+                    self.dataReceivedCallback!(sampleBuffer!)
                 }
 //                inputStream.read(&buffer, maxLength: bufferSize)
-            }
+                
+//            }
+//            if (outputStream?.hasSpaceAvailable)! {
+//            outputStream?.write(&buffer, maxLength: 1024)
+            
+//            }
+            
+
+            
+
+
         }
     }
 }
